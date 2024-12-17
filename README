@@ -1,0 +1,39 @@
+# GAEDM
+
+## News
+
+
+## introduction
+
+A Novel Genetic Algorithm-Enhanced Model for Detecting API Hashing Obfuscation in Malware
+
+## usage
+
+##preprocess
+We provide a example script to process the binary code. The script is located at `scripts/process.py`. You can use the script to process your own binaries.
+```
+/path/to/idat64 -c -A -S"scripts/process.py /path/to/binary_json"  /path/to/binary
+```
+
+##Model identification
+```
+python GAEDM/identify.py /path/to/binary_json
+```
+
+
+MalwareHash.txt is the sha256 hash list of the samples refered in paper
+
+### requirement
+
+- Python 3.9+
+- torch 1.12.0
+- torchaudio 0.12.0
+- torchvision 0.13.0
+- transformers 4.39.2
+...
+
+
+## contact
+
+
+- Email: blueyanglan@sina.com

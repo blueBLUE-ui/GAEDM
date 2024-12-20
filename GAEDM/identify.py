@@ -44,11 +44,28 @@ class ModifiedModel(nn.Module):
         probs = self.sigmoid(logits)
         return probs
 if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: python identify.py <model_dict_path> <target_file_json>")
+        exit(0)
+    # path/to/encoder
     tokenizer = AutoTokenizer.from_pretrained(r"..\pretrain", trust_remote_code=True)
     tokenizer.pad_token = tokenizer.unk_token
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # path/to/encoder
     encoder = AsmEncoder.from_pretrained(r"..\pretrain", trust_remote_code=True).to(device)
     # Initialize your model
+    model_path = sys.argv[1]
+    target_file = sys.argv[2]
+    if os.path.exists(model_path):
+        print("Loading pretrained model from", model_path)
+    else:
+        print("Model path does not exist")
+        exit(0)
+    if os.path.exists(target_file):
+        print("Loading target file from", target_file)
+    else:
+        print("Target file does not exist")
+        exit(0)
     model = ModifiedModel(encoder).to(device)
     pretrained_dict = torch.load(r'.\model_dict.pth')
     new_pretrained_dict = OrderedDict()

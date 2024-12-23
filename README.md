@@ -35,7 +35,7 @@ We provide a example script to process the binary code. The script is located at
 
 
 ```
-python GAEDM/identify.py path_to_model_dict /path/to/binary_json 
+python GAEDM/identify.py path/to/encoder path/to/model/dict /path/to/binary_json 
 ```
 
 

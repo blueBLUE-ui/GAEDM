@@ -47,6 +47,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 4:
         print("Usage: python identify.py <encoder_path> <model_dict_path> <target_file_json>")
         exit(0)
+    
     if os.path.exists(encoder_path):
         print("Loading encoder from", encoder_path)
     else:

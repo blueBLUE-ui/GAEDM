@@ -13,9 +13,9 @@ torch.backends.cudnn.benchmark = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class ModifiedModel(nn.Module):
+class GAEDM(nn.Module):
     def __init__(self, encoder):
-        super(ModifiedModel, self).__init__()
+        super(GAEDM, self).__init__()
         self.encoder = encoder
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512, 256)
@@ -48,7 +48,7 @@ def load_model_and_tokenizer(encoder_path, model_dict_path):
     tokenizer = AutoTokenizer.from_pretrained(encoder_path, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.unk_token
     encoder = AsmEncoder.from_pretrained(encoder_path, trust_remote_code=True).to(device)
-    model = ModifiedModel(encoder).to(device)
+    model = GAEDM(encoder).to(device)
 
     print(f"Loading pretrained model from {model_dict_path}")
     if not os.path.exists(model_dict_path):

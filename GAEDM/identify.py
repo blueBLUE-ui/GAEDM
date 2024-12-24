@@ -1,17 +1,18 @@
 import torch
-from torch import nn  
+from torch import nn
 import torch.nn.init as init
 import json
 from mytrans import tokenize_function, AsmEncoder
-# from model import AsmEncoder
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer
 import os
 import sys
-from collections import OrderedDict
-target_file = r"..\CaseStudy\DRIDEX.json"
+import argparse
+
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 class ModifiedModel(nn.Module):
     def __init__(self, encoder):
         super(ModifiedModel, self).__init__()
@@ -23,68 +24,53 @@ class ModifiedModel(nn.Module):
         self.fc5 = nn.Linear(64, 1)
         self.sigmoid = nn.Sigmoid()
         self._initialize_weights()
+
     def _initialize_weights(self):
-        init.xavier_uniform_(self.fc1.weight) 
-        init.zeros_(self.fc1.bias)             
-        init.xavier_uniform_(self.fc2.weight)  
-        init.zeros_(self.fc2.bias)            
-        init.xavier_uniform_(self.fc3.weight) 
-        init.zeros_(self.fc3.bias)             
-        init.xavier_uniform_(self.fc4.weight)  
-        init.zeros_(self.fc4.bias)      
-        init.xavier_uniform_(self.fc5.weight)  
-        init.zeros_(self.fc5.bias)             
+        for layer in [self.fc1, self.fc2, self.fc3, self.fc4, self.fc5]:
+            init.xavier_uniform_(layer.weight)
+            init.zeros_(layer.bias)
+
     def forward(self, input_ids):
-        encoder_output = self.encoder(**input_ids).to(device) 
-        logits = self.fc1(encoder_output)
-        logits = self.fc2(logits)
-        logits = self.fc3(logits)
-        logits = self.fc4(logits)
-        logits = self.fc5(logits)
+        encoder_output = self.encoder(**input_ids).last_hidden_state[:, 0, :]  # 获取[CLS] token的输出
+        logits = encoder_output
+        for fc_layer in [self.fc1, self.fc2, self.fc3, self.fc4, self.fc5]:
+            logits = fc_layer(logits)
         probs = self.sigmoid(logits)
         return probs
-if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Usage: python identify.py <encoder_path> <model_dict_path> <target_file_json>")
-        exit(0)
-    
-    if os.path.exists(encoder_path):
-        print("Loading encoder from", encoder_path)
-    else:
-        print("Model path does not exist")
-        exit(0)
-    encoder_path = sys.argv[1]
-    # path/to/encoder
+
+
+def load_model_and_tokenizer(encoder_path, model_dict_path):
+    print(f"Loading encoder from {encoder_path}")
+    if not os.path.exists(encoder_path):
+        print(f"Error: Encoder path does not exist - {encoder_path}")
+        exit(1)
+
     tokenizer = AutoTokenizer.from_pretrained(encoder_path, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.unk_token
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # path/to/encoder
     encoder = AsmEncoder.from_pretrained(encoder_path, trust_remote_code=True).to(device)
-    # Initialize your model
-    model_path = sys.argv[2]
-    target_file = sys.argv[3]
-    if os.path.exists(model_path):
-        print("Loading pretrained model from", model_path)
-    else:
-        print("Model path does not exist")
-        exit(0)
-    if os.path.exists(target_file):
-        print("Loading target file from", target_file)
-    else:
-        print("Target file does not exist")
-        exit(0)
     model = ModifiedModel(encoder).to(device)
-    pretrained_dict = torch.load(r'.\model_dict.pth')
-    new_pretrained_dict = OrderedDict()
-    for k, v in pretrained_dict.items():
-        new_k = k.replace('module.', '')
-        new_pretrained_dict[new_k] = v
 
-    # # Load the weights into your model
+    print(f"Loading pretrained model from {model_dict_path}")
+    if not os.path.exists(model_dict_path):
+        print(f"Error: Model dictionary path does not exist - {model_dict_path}")
+        exit(1)
+
+    pretrained_dict = torch.load(model_dict_path, map_location=device)
+    new_pretrained_dict = {k.replace('module.', ''): v for k, v in pretrained_dict.items()}
     model.load_state_dict(new_pretrained_dict)
     model.eval()
+    return model, tokenizer
+
+
+def process_target_file(target_file, model, tokenizer):
+    print(f"Loading target file from {target_file}")
+    if not os.path.exists(target_file):
+        print(f"Error: Target file does not exist - {target_file}")
+        exit(1)
+
     with open(target_file) as fp:
         data = json.load(fp)
+
     logits_dict = {}
     with torch.no_grad():
         for key, value in data.items():
@@ -92,7 +78,35 @@ if __name__ == "__main__":
             model_input = tokenizer.pad([asm], padding=True, pad_to_multiple_of=8, return_tensors="pt").to(device)
             logits = model(model_input)
             logits_dict[key] = logits
+
     sorted_keys = sorted(logits_dict.keys(), key=lambda k: logits_dict[k].max().item(), reverse=True)
 
     for key in sorted_keys:
         print(f"Key: {key}, Logit Max: {logits_dict[key].max().item()}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Process and evaluate a target file using GAEDM.")
+    
+    parser.add_argument(
+        "encoder_path",
+        type=str,
+        help="Path to the encoder directory."
+    )
+    
+    parser.add_argument(
+        "model_dict_path",
+        type=str,
+        help="Path to the model dictionary (state dict)."
+    )
+    
+    parser.add_argument(
+        "target_file",
+        type=str,
+        help="Path to the target JSON file containing the data to be processed."
+    )
+
+    args = parser.parse_args()
+
+    model, tokenizer = load_model_and_tokenizer(args.encoder_path, args.model_dict_path)
+    process_target_file(args.target_file, model, tokenizer)

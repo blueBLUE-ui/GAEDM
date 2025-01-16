@@ -82,7 +82,7 @@ def process_target_file(target_file, model, tokenizer):
     sorted_keys = sorted(logits_dict.keys(), key=lambda k: logits_dict[k].max().item(), reverse=True)
 
     for key in sorted_keys:
-        print(f"Key: {key}, Logit Max: {logits_dict[key].max().item()}")
+        print(f"function: {key}")
 
 
 if __name__ == "__main__":
